@@ -1,0 +1,70 @@
+#!/bin/bash
+# Automated Theme Managment - themeon
+# Copyright (C) vinctux (Jaka Smrekar), 2015-16
+# This file is part of themeon (https://github.com/vinctux/themeon/),
+# a project licensed under the MIT license.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# themeon v1.0
+THEMEON_VERSION="v1.0"
+
+
+THEME=$1
+TEXECDIR="$HOME/.config/themeon/$THEME"
+[[ -s $TEXECDIR/$THEME.tconf ]] || { echo "[ERROR] You're trying to uninstall a theme which isn't installed as $USER."; exit 1; }
+SETTINGS=$(cat $TEXECDIR/settings.themeon)
+. $TEXECDIR/$THEME.tconf
+
+# Pre-Uninstall Exec
+. $TEXECDIR/REMOVE_PREEXEC-$THEME.texe
+
+clear
+COLUMNS=$(tput cols)
+title="themeon Automated Theme Managment $THEMEON_VERSION by Jaka Smrekar (@vinctux), 2015-16"
+intro="$THEME by $AUTHOR ($RELEASE) Uninstall Script"
+ilen=$((($COLUMNS-${#intro})/2))
+
+printf "%*s\n" $(((${#title}+$COLUMNS)/2)) "$title"
+printf " %.0s" $(seq 1 $ilen)
+printf "=%.0s" $(seq 1 ${#intro}); printf "\n"
+printf "%*s\n" $(((${#intro}+$COLUMNS)/2)) "$intro"
+printf " %.0s" $(seq 1 $ilen)
+printf "=%.0s" $(seq 1 ${#intro}); printf "\n"
+
+# Declare install paths
+THEMEDIR=(/usr/share/themes/ $HOME/.themes/)
+ICONSDIR=(/usr/share/icons/ $HOME/.icons/)
+PLANKDIR=(/usr/share/plank/themes/ $HOME/.local/share/plank/themes/)
+
+# Check install mode
+MODE=1
+[[ $(grep "MODE=0" -c <<< $SETTINGS) == 1 ]] && { MODE=0; }
+
+# Check root
+[[ "$MODE" -eq 0 && $EUID -ne 0 ]] && { echo "[ERROR] System-wide uninstall must be run as root." 2>&1; exit 1; }
+
+# Remove things
+[[ -d ${ICONSDIR[MODE]}$THEME ]] && { rm -rf ${ICONSDIR[MODE]}$THEME; }
+[[ -d ${PLANKDIR[MODE]}$THEME ]] && { rm -rf ${PLANKDIR[MODE]}$THEME; }
+[[ -d ${THEMEDIR[MODE]}$THEME ]] && { rm -rf ${THEMEDIR[MODE]}$THEME; }
+
+# Reset gsettings
+[[ $(grep "GSETTINGS=1" -c <<< $SETTINGS) == 1 ]] && { gsettings reset org.gnome.desktop.interface gtk-theme; gsettings reset org.gnome.desktop.wm.preferences theme; }
+
+# Purge deps if said so
+[ $REMOVE_PURGE_DEPS = true ] && { for d in "${DEPS[@]}"; do sudo apt-get remove $d --purge; done; }
+
+echo "DONE WITH UNINSTALL! Goodbye."
+
+# Post-Uninstall Exec
+. $TEXECDIR/REMOVE_POSTEXEC-$THEME.texe
+
+# Remove theme settings
+[[ -d $TEXECDIR ]] && { rm -rf $TEXECDIR; }

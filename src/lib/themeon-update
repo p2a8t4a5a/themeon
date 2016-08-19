@@ -1,0 +1,30 @@
+#!/bin/bash
+# Automated Theme Managment - themeon
+# Copyright (C) vinctux (Jaka Smrekar), 2015-16
+# This file is part of themeon (https://github.com/vinctux/themeon/),
+# a project licensed under the MIT license.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# themeon v1.0
+THEMEON_VERSION="v1.0"
+
+
+THEME=$1
+TEXECDIR="$HOME/.config/themeon/$THEME"
+[[ -s $TEXECDIR/$THEME.tconf ]] || { echo "[ERROR] You're trying to update a theme which isn't installed as $USER."; exit 1; }
+. $TEXECDIR/$THEME.tconf
+
+# Pre-Update Exec
+. $TEXECDIR/UPDATE_PREEXEC-$THEME.texe
+
+[[ $(grep "MODE=0" -c <<< $(cat $TEXECDIR/settings.themeon)) == 1 ]] && { sudo $UPDATE_EXECF -U $THEME; } || { $UPDATE_EXECF -U $THEME; }
+
+# Post-Update Exec
+. $TEXECDIR/UPDATE_POSTEXEC-$THEME.texe

@@ -1,0 +1,56 @@
+#!/bin/bash
+# Automated Theme Managment - themeon
+# Copyright (C) vinctux (Jaka Smrekar), 2015-16
+# This file is part of themeon (https://github.com/vinctux/themeon/),
+# a project licensed under the MIT license.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# themeon v1.0
+THEMEON_VERSION="v1.0"
+
+themeon_usage() {
+	echo
+	echo "Usage:"
+	echo "     themeon CMD ARGS"
+	echo
+	echo "Commands"
+	echo "   install        Install a theme."
+	echo "   update         Update a theme."
+	echo "   remove         Uninstall a theme."
+	echo "   build          Create a customized themeon configuration ('.tconf')."
+	echo "   list           List currently installed themes."
+	echo
+	echo "Arguments"
+	echo "   install"
+	echo "      [--user|--sys]          Either user-wide or system-wide install. Required."
+	echo "      tconf                   Path to themeon configuration (like an web address)."
+	echo "      sha                     SHA 256-bit hash sum of themeon configuration. Should be provided by theme developer."
+	echo "   update"
+	echo "      theme                   Name of theme to update."
+	echo "   remove"
+	echo "      theme                   Name of theme to remove."
+	echo "   build"
+	echo "      theme                   Name of your theme you wish to build a themeon configuration for."
+	echo "      tconf                   Path to output themeon configuration."
+	echo "   --help                     Shows this help."
+	echo
+}
+
+
+echo "themeon Automated Theme Managment $THEMEON_VERSION by Jaka Smrekar (@vinctux), 2015-16."
+echo "  [  Report bugs to https://github.com/vinctux/themeon/issues  ]"
+
+NEEDUSAGE=false
+[[ $1 == "install" ]] && { [[ $2 == "--user" || $2 == "--sys" ]] && { /usr/lib/themeon/themeon-install $2 $3 $4 $5; exit 0; } || { themeon_usage; }; } || { NEEDUSAGE=true; }
+[[ $1 == "update" ]]  && { /usr/lib/themeon/themeon-update $2; exit 0; }    || { NEEDUSAGE=true; }
+[[ $1 == "remove" ]]  && { /usr/lib/themeon/themeon-uninstall $2; exit 0; } || { NEEDUSAGE=true; }
+[[ $1 == "build" ]]   && { /usr/lib/themeon/themeon-build  $2 $3; exit 0; } || { NEEDUSAGE=true; }
+[[ $1 == "list" ]]    && { /usr/lib/themeon/themeon-list; exit 0; }         || { NEEDUSAGE=true; }
+[[ $1 == "" || $1 == "--help" || $NEEDUSAGE ]] && { themeon_usage; exit 0; }

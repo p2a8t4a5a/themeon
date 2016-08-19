@@ -1,0 +1,24 @@
+#!/bin/bash
+# Automated Theme Managment - themeon
+# Copyright (C) vinctux (Jaka Smrekar), 2015-16
+# This file is part of themeon (https://github.com/vinctux/themeon/),
+# a project licensed under the MIT license.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# themeon v1.0
+THEMEON_VERSION="v1.0"
+
+[[ $1 == "" || $(grep -c ".tconf" <<< $1) == 1 ]] && { echo "[ERROR] First argument must be a theme name, second argument must be a filename with a '.tconf' extension."; exit 1; }
+[[ $2 == "" || $(grep -c ".tconf" <<< $2) == 0 ]] && { echo "[ERROR] Empty or invalid file name provided."; exit 1; }
+
+cp /usr/lib/themeon/conf/temp.tconf $2
+sed -i 's/THEME=""/THEME="'$1'"/g' $2
+nano $2
+sha256sum $2

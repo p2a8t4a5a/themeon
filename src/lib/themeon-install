@@ -1,0 +1,193 @@
+#!/bin/bash
+# Automated Theme Managment - themeon
+# Copyright (C) vinctux (Jaka Smrekar), 2015-16
+# This file is part of themeon (https://github.com/vinctux/themeon/),
+# a project licensed under the MIT license.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# themeon v1.0
+THEMEON_VERSION="v1.0"
+
+LOCAL_MODE=false
+UPDATE_MODE=false
+[[ $1 == "-U" ]] && { UPDATE_MODE=true; }
+[[ $4 == "-L" ]] && { LOCAL_MODE=true; }
+
+if [ $UPDATE_MODE = true ]; then
+    THEME=$2
+    TEXECDIR="$HOME/.config/themeon/$THEME"
+    THEMEONDIR=$TEXECDIR
+    SETTINGS=$(cat $THEMEONDIR/settings.themeon)
+    . $TEXECDIR/$THEME.tconf
+else
+    # Load config file
+    [[ $(grep -c ".tconf" <<< $2) == 1 ]] || { echo "[ERROR] No valid external '.tconf' configuration file given."; exit 1; }
+    TMPTCONF=/tmp/tmp.tconf
+    rm -f $TMPTCONF
+    [ LOCAL_MODE = true ] && { cp $2 $TMPTCONF; } || { wget $2 -O $TMPTCONF -q -w 3; }
+    [[ $(sha256sum $TMPTCONF | cut -d " " -f 1) == $3 ]] || { echo "[ERROR] Spoiled '.tconf' detected! SHA256 hash mismatch!"; exit 1; }
+    . $TMPTCONF
+    mv -f $TMPTCONF $TEXECDIR/$THEME.tconf
+
+    # Pre-Install Exec
+    . $TEXECDIR/INSTALL_PREEXEC-$THEME.texe
+
+    # Declare themeon's config path
+    THEMEONDIR=$TEXECDIR
+    [[ -d $THEMEONDIR ]] || { mkdir -p $THEMEONDIR; }
+fi
+
+clear
+COLUMNS=$(tput cols)
+title="themeon Automated Theme Managment $THEMEON_VERSION by Jaka Smrekar (@vinctux), 2015-16"
+[ $UPDATE_MODE = true ] && { intro="$THEME by $AUTHOR ($RELEASE) Update Script"; } || { intro="$THEME by $AUTHOR ($RELEASE) Install Script"; }
+ilen=$((($COLUMNS-${#intro})/2))
+
+printf "%*s\n" $(((${#title}+$COLUMNS)/2)) "$title"
+printf " %.0s" $(seq 1 $ilen)
+printf "=%.0s" $(seq 1 ${#intro}); printf "\n"
+printf "%*s\n" $(((${#intro}+$COLUMNS)/2)) "$intro"
+printf " %.0s" $(seq 1 $ilen)
+printf "=%.0s" $(seq 1 ${#intro}); printf "\n"
+
+
+# Declare install paths
+THEMEDIR=(/usr/share/themes/ $HOME/.themes/)
+ICONSDIR=(/usr/share/icons/ $HOME/.icons/)
+PLANKDIR=(/usr/share/plank/themes/ $HOME/.local/share/plank/themes/)
+
+# Ensure that the user-specific folders exist
+[[ -d ${THEMEDIR[1]} ]] || { mkdir -p ${THEMEDIR[1]}; }
+[[ -d ${ICONSDIR[1]} ]] || { mkdir -p ${ICONSDIR[1]}; }
+[[ -d ${PLANKDIR[1]} ]] || { mkdir -p ${PLANKDIR[1]}; }
+
+# Install $THEME's dependencies
+if [ $UPDATE_MODE = false ]; then
+    echo "[INFO] Installing dependencies . . ."
+    for d in "${DEPS[@]}"; do [[ $(dpkg-query -W -f='${Status}' $d 2>/dev/null | grep -c "ok installed") -eq 0 ]] && { sudo apt-get install $d -y; }; done;
+    echo "[INFO] Done with installing dependencies!"
+fi
+
+# Check install mode
+if [ $UPDATE_MODE = false ]; then
+    MODE=1
+    [[ $1 == "--sys" ]] && { [[ $EUID -ne 0 ]] && { echo "[ERROR] System-wide install must be run as root." 2>&1; exit 1; } || { MODE=0; }; }
+    echo "[INFO] Installing $THEME as $USER."
+else
+    MODE=1
+    [[ $EUID -ne 0 ]] || { MODE=0; }
+    echo "[INFO] Updating $THEME as $USER."
+fi
+
+if [ $UPDATE_MODE = true ]; then
+    CANAL=N
+    [[ $(grep "CANAL=S" -c <<< $SETTINGS) == 1 ]] && { $CANAL=S; }
+else
+    read -p "Stable [S/s] release or night [N/n] (maybe unstable) build? " CANAL
+fi
+
+# Real install
+case $CANAL in
+    [Ss]* )
+        if [[ $GITHUB == true && $AUTHOR != "" && $RELEASE != "" ]]; then
+            echo "[INFO] Downloading stable source from GitHub . . ."
+            rm -f $THEME.tar
+            wget https://github.com/$AUTHOR/$THEME/releases/download/$RELEASE/$THEME.tar -O /tmp/$THEME.tar -q -w 3
+        elif [[ $GITHUB == false && $RELEASE != "" && $RELEASEURL != "" ]]; then
+            echo "[INFO] Downloading stable source from custom address . . ."
+            rm -f $THEME.tar
+            wget $RELEASEURL -O /tmp/$THEME.tar -q -w 3
+        else
+            echo "[ERROR] Can't download stable build. Try again with night build."
+            exit 1
+        fi
+        echo "[INFO] Download of $THEME's taped archive complete."
+        echo "[INFO] Extracting $THEME's taped archive . . ."
+        rm -rf /tmp/$THEME
+        tar -xvf /tmp/$THEME.tar
+        echo "[INFO] Archive extracted!"
+        [[ -d "${THEMEDIR[MODE]}$THEME" ]] && { rm -rf ${THEMEDIR[MODE]}$THEME; mkdir ${THEMEDIR[MODE]}$THEME; }
+        mv /tmp/$THEME ${THEMEDIR[MODE]}
+        echo "[INFO] Cleaning up . . ."
+        rm -f /tmp/$THEME.tar
+        rm -rf /tmp/$THEME
+        echo "DONE WITH STABLE PULL!"
+        ;;
+    [Nn]* )
+        [[ $(dpkg-query -W -f='${Status}' git 2>/dev/null | grep -c "ok installed") ]] || { echo "Installing 'git' . . ."; sudo apt-get install git -y; }
+        echo "[INFO] Cloning from git source . . ."
+        [[ -d "${THEMEDIR[MODE]}$THEME" ]] && { cd ${THEMEDIR[MODE]}$THEME; git pull; } || { cd ${THEMEDIR[MODE]}; git clone $GITURL; }
+        echo "DONE WITH NIGHT PULL!"
+        ;;
+esac
+
+
+### Check support for [GTK2, GTK3, Unity, XFCE Window Manager 4, Plank, Cinnamon, Gnome Shell, Metacity] ###
+[[ -d ${THEMEDIR[MODE]}$THEME/gtk-2.0 ]]     && { GTK2S=true; }       || { GTK2S=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/gtk-3.0 ]]     && { GTK3S=true; }       || { GTK3S=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/unity ]]       && { UNITYS=true; }      || { UNITYS=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/xfwm4 ]]       && { XFWM4S=true; }      || { XFWM4S=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/plank ]]       && { PLANKS=true; }      || { PLANKS=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/cinnamon ]]    && { CINNAMONS=true; }   || { CINNAMONS=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/gnome-shell ]] && { GNOMESHELLS=true; } || { GNOMESHELLS=false; }
+[[ -d ${THEMEDIR[MODE]}$THEME/metacity-1 ]]  && { METACITYS=true; }   || { METACITYS=false; }
+
+
+### FIXES ###
+# Fix plank issue (if existent)
+if [[ -d ${THEMEDIR[MODE]}$THEME/plank ]]; then
+    echo "[INFO] Placing 'plank' theme files into ${PLANKDIR[MODE]}$THEME . . ."
+    rm -rf ${PLANKDIR[MODE]}$THEME
+    mkdir ${PLANKDIR[MODE]}$THEME
+    cp -f ${THEMEDIR[MODE]}$THEME/plank/* ${PLANKDIR[MODE]}$THEME
+fi
+
+# Fix icon issue (if existent)
+if [[ -d ${THEMEDIR[MODE]}$THEME/icons ]]; then
+    echo "[INFO] Placing 'icon' files into ${ICONSDIR[MODE]}$THEME . . ."
+    rm -rf ${ICONSDIR[MODE]}$THEME
+    mkdir ${ICONSDIR[MODE]}$THEME
+    cp -f ${THEMEDIR[MODE]}$THEME/icons/* ${ICONSDIR[MODE]}$THEME
+    [[ -d "${THEMEDIR[MODE]}$THEME/icons/scalable" ]] && { [[ $(dpkg-query -W -f='${Status}' librsvg 2>/dev/null | grep -c "ok installed") -eq 0 ]] && { echo "Installing 'librsvg' for scalable icons . . ."; sudo apt-get install librsvg -y; }; }
+    gtk-update-icon-cache -f -t ${ICONSDIR[MODE]}$THEME
+fi
+
+# Fix cursor issue (if existent)
+if [[ -d ${THEMEDIR[MODE]}$THEME/cursors ]]; then
+    echo "[INFO] Placing 'cursor' files into ${ICONSDIR[MODE]}$THEME/cursors . . ."
+    rm -rf ${ICONSDIR[MODE]}$THEME/cursors
+    mkdir ${ICONSDIR[MODE]}$THEME/cursors
+    cp -f ${THEMEDIR[MODE]}$THEME/cursors/* ${ICONSDIR[MODE]}$THEME/cursors
+fi
+
+# Activate [GTK] theme immediately on GNOME
+GSETTINGS=0
+if [[ -d ${THEMEDIR[MODE]}$THEME/gtk-2.0/ || -d ${THEMEDIR[MODE]}$THEME/gtk-3.0/ ]]; then
+    [ $UPDATE_MODE = true ] && { [[ $(grep "GSETTINGS=1" -c <<< $SETTINGS) == 1 ]] && gset=S || gset=N; } || { read -p "Activate the [GTK 2+3] theme right now? This will however work only with GNOME. [Y/N] " gset; }
+    case $gset in
+        [YSys]* )
+            [[ $(dpkg-query -W -f='${Status}' gsettings 2>/dev/null | grep -c "ok installed") ]] || { echo "Installing 'gsettings' . . ."; sudo apt-get install gsettings -y; }
+            [[ $gset=S ]] || { echo "[INFO] Activating [GTK] theme (via gsettings) . . ."; }
+            gsettings reset org.gnome.desktop.interface gtk-theme
+            gsettings reset org.gnome.desktop.wm.preferences theme
+            gsettings set org.gnome.desktop.interface gtk-theme "$THEME"
+            gsettings set org.gnome.desktop.wm.preferences theme "$THEME"
+            [[ $gset=S ]] || { echo "DONE WITH ACTIVATING!"; }
+            GSETTINGS=1
+            ;;
+        [Nn]* ) ;;
+    esac
+fi
+
+# Save settings
+[ $UPDATE_MODE = true ] || { echo "VER=$THEMEON_VERSION; THEME=[$THEME]; MODE=$MODE; CANAL=$CANAL; SUPPORTS=[$GTK2S; $GTK3S; $UNITYS; $XFWM4S; $PLANKS; $CINNAMONS; $GNOMESHELLS; $METACITYS]; GSETTINGS=$GSETTINGS;" > $THEMEONDIR/settings.themeon; }
+
+# Post-Install Exec
+[ $UPDATE_MODE = true ] || { . $TEXECDIR/INSTALL_POSTEXEC-$THEME.texe; }
